@@ -40,3 +40,14 @@ rust_library {
     rustlibs: ["libtee_client_api_bindgen"],
     shared_libs: ["libteec"],
 }
+
+rust_library {
+    name: "libtee_optee_channel",
+    crate_name: "tee_optee_channel",
+    vendor: true,
+    srcs: ["optee_channel.rs"],
+    rustlibs: [
+        "libtee_optee_bindings",
+        "liblog_rust",
+    ],
+}
