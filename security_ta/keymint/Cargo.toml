@@ -1,0 +1,127 @@
+#
+# Copyright (C) 2024 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[package]
+name = "ta"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["log-warn"]
+# Log level features - only one should be enabled
+log-off = []
+log-warn = []
+log-info = []
+log-debug = []
+log-trace = []
+
+[dependencies]
+der = { version = "^0.7.2", features = ["alloc", "derive"] }
+ed25519-dalek = { version = "2.1.1", default-features = false }
+hex = { version = "0.4", default-features = false }
+kmr-common = "*"
+kmr-ta = "*"
+kmr-wire = "*"
+log = "0.4"
+optee-ipc-ta = { path = "../../optee_channel/optee-ipc-ta" }
+optee-logger-ta = { path = "../../optee_channel/optee-logger-ta" }
+optee-utee = { path = "../../../../../external/rust/teaclave-trustzone-sdk/optee-utee", default-features = false }
+optee-utee-sys = { path = "../../../../../external/rust/teaclave-trustzone-sdk/optee-utee/optee-utee-sys", default-features = false }
+pkcs1 = { version = "^0.7.5", features = ["alloc", "pkcs8"] }
+pkcs8 = "^0.10.2"
+sec1 = { version = "0.7.3", features = ["alloc", "der", "pkcs8", "point"] }
+spin = { version = "0.10", default-features = false, features = ["once", "mutex", "spin_mutex"] }
+typenum = "1.17.0"
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
+zeroize = { version = "^1.5.6", features = ["alloc", "zeroize_derive"] }
+
+[patch.crates-io]
+# Builds are offline: every crates.io dependency is taken from the AOSP tree.
+# Use local AOSP system/keymint from manifest
+kmr-common = { path = "../../../../../system/keymint/common" }
+kmr-derive = { path = "../../../../../system/keymint/derive" }
+kmr-ta = { path = "../../../../../system/keymint/ta" }
+kmr-wire = { path = "../../../../../system/keymint/wire" }
+# AOSP only vendors const-oid 0.10, exposed as 0.9 by a shim (see its Cargo.toml)
+const-oid = { path = "../rust/const-oid" }
+# Crates not vendored in AOSP: crates.io releases, one repository per crate
+base16ct = { path = "../../../../../external/rust/crates/base16ct" }
+base64ct = { path = "../../../../../external/rust/crates/base64ct" }
+block-buffer = { path = "../../../../../external/rust/crates/block-buffer" }
+cpufeatures = { path = "../../../../../external/rust/crates/cpufeatures" }
+crunchy = { path = "../../../../../external/rust/crates/crunchy" }
+crypto-common = { path = "../../../../../external/rust/crates/crypto-common" }
+curve25519-dalek = { path = "../../../../../external/rust/crates/curve25519-dalek" }
+curve25519-dalek-derive = { path = "../../../../../external/rust/crates/curve25519-dalek-derive" }
+digest = { path = "../../../../../external/rust/crates/digest" }
+ed25519 = { path = "../../../../../external/rust/crates/ed25519" }
+ed25519-dalek = { path = "../../../../../external/rust/crates/ed25519-dalek" }
+fiat-crypto = { path = "../../../../../external/rust/crates/fiat-crypto" }
+generic-array = { path = "../../../../../external/rust/crates/generic-array" }
+libc_alloc = { path = "../../../../../external/rust/crates/libc_alloc" }
+rustc_version = { path = "../../../../../external/rust/crates/rustc_version" }
+sha2 = { path = "../../../../../external/rust/crates/sha2" }
+signature = { path = "../../../../../external/rust/crates/signature" }
+typenum = { path = "../../../../../external/rust/crates/typenum" }
+version_check = { path = "../../../../../external/rust/crates/version_check" }
+x25519-dalek = { path = "../../../../../external/rust/crates/x25519-dalek" }
+# Crates vendored in AOSP external/rust/android-crates-io
+bitflags = { path = "../../../../../external/rust/android-crates-io/crates/bitflags" }
+cfg-if = { path = "../../../../../external/rust/android-crates-io/crates/cfg-if" }
+ciborium = { path = "../../../../../external/rust/android-crates-io/crates/ciborium" }
+ciborium-io = { path = "../../../../../external/rust/android-crates-io/crates/ciborium-io" }
+ciborium-ll = { path = "../../../../../external/rust/android-crates-io/crates/ciborium-ll" }
+coset = { path = "../../../../../external/rust/android-crates-io/crates/coset" }
+der = { path = "../../../../../external/rust/android-crates-io/crates/der" }
+der_derive = { path = "../../../../../external/rust/android-crates-io/crates/der_derive" }
+enumn = { path = "../../../../../external/rust/android-crates-io/crates/enumn" }
+flagset = { path = "../../../../../external/rust/android-crates-io/crates/flagset" }
+half = { path = "../../../../../external/rust/android-crates-io/crates/half" }
+heck = { path = "../../../../../external/rust/android-crates-io/crates/heck" }
+hex = { path = "../../../../../external/rust/android-crates-io/crates/hex" }
+libc = { path = "../../../../../external/rust/android-crates-io/crates/libc" }
+log = { path = "../../../../../external/rust/android-crates-io/crates/log" }
+pkcs1 = { path = "../../../../../external/rust/android-crates-io/crates/pkcs1" }
+pkcs8 = { path = "../../../../../external/rust/android-crates-io/crates/pkcs8" }
+proc-macro2 = { path = "../../../../../external/rust/android-crates-io/crates/proc-macro2" }
+quote = { path = "../../../../../external/rust/android-crates-io/crates/quote" }
+sec1 = { path = "../../../../../external/rust/android-crates-io/crates/sec1" }
+semver = { path = "../../../../../external/rust/android-crates-io/crates/semver" }
+serde = { path = "../../../../../external/rust/android-crates-io/crates/serde" }
+serde_core = { path = "../../../../../external/rust/android-crates-io/crates/serde_core" }
+serde_derive = { path = "../../../../../external/rust/android-crates-io/crates/serde_derive" }
+spin = { path = "../../../../../external/rust/android-crates-io/crates/spin" }
+spki = { path = "../../../../../external/rust/android-crates-io/crates/spki" }
+strum_macros = { path = "../../../../../external/rust/android-crates-io/crates/strum_macros" }
+subtle = { path = "../../../../../external/rust/android-crates-io/crates/subtle" }
+syn = { path = "../../../../../external/rust/android-crates-io/crates/syn" }
+unicode-ident = { path = "../../../../../external/rust/android-crates-io/crates/unicode-ident" }
+uuid = { path = "../../../../../external/rust/android-crates-io/crates/uuid" }
+x509-cert = { path = "../../../../../external/rust/android-crates-io/crates/x509-cert" }
+zeroize = { path = "../../../../../external/rust/android-crates-io/crates/zeroize" }
+zeroize_derive = { path = "../../../../../external/rust/android-crates-io/crates/zeroize_derive" }
+rand_core = { path = "../../../../../external/rust/android-crates-io/extra_versions/crates/rand_core" }
+
+[profile.release]
+panic = "abort"
+lto = true
+opt-level = 3
+codegen-units = 1
+
+[profile.dev]
+panic = "abort"
+opt-level = 0
+debug = true
+lto = false

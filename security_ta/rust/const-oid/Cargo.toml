@@ -1,0 +1,38 @@
+#
+# Copyright (C) 2026 BayLibre
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Shim exposing AOSP's const-oid 0.10 as const-oid 0.9.
+#
+# der 0.7, spki 0.7 and x509-cert 0.2 require const-oid ^0.9, while AOSP only
+# vendors const-oid 0.10. Soong ignores semver and already builds those crates
+# against the 0.10 sources (see external/rust/android-crates-io/crates/der/Android.bp),
+# but cargo cannot [patch] a ^0.9 requirement with a 0.10 crate. This crate is
+# the [patch] target instead and re-exports the AOSP sources unchanged.
+
+[package]
+name = "const-oid"
+version = "0.9.6"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[features]
+db = ["const-oid-aosp/db"]
+# Features referenced by dependents of const-oid 0.9, not used by the TAs
+arbitrary = []
+std = []
+
+[dependencies]
+const-oid-aosp = { package = "const-oid", path = "../../../../../../external/rust/android-crates-io/crates/const-oid" }
