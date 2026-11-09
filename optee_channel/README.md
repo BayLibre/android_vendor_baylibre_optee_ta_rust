@@ -91,6 +91,12 @@ request and the response are carried by separate commands:
    the chunk data. `TEEC_ERROR_NO_DATA` also ends the response.
 3. The chunk data are concatenated into the response.
 
+#### Input Only: `invoke_with_input()`
+
+Invokes any command with a single MEMREF_TEMP_INPUT in param[0] and no output,
+and returns the TEEC result code on failure. Used by
+`keymint-optee-provision-ids` for `SET_ATTESTATION_IDS` (0x10001).
+
 #### Error Handling
 
 Errors are returned to the HAL, which turns them into a binder

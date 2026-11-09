@@ -15,7 +15,7 @@
 
 //! Shared OP-TEE IPC channel for HAL services.
 //!
-//! Provides two execution modes:
+//! Provides three execution modes:
 //!
 //! - [`OpteeChannel::execute`]: split CMD_WRITE (1024) / CMD_READ (1025) protocol
 //!   used by the KeyMint Rust TA.  Each response may be delivered in multiple
@@ -24,6 +24,10 @@
 //! - [`OpteeChannel::execute_single`]: single TEEC_InvokeCommand with
 //!   param[0]=MEMREF_TEMP_INPUT (request) and param[1]=MEMREF_TEMP_OUTPUT (response).
 //!   Used by the Gatekeeper Rust TA whose responses are small and bounded.
+//!
+//! - [`OpteeChannel::invoke_with_input`]: single TEEC_InvokeCommand with
+//!   param[0]=MEMREF_TEMP_INPUT and no response, returning the TEEC result code.
+//!   Used by the KeyMint attestation ID provisioning tool.
 
 use tee_optee_bindings::{
     param_types, uuid_from_str,
@@ -264,6 +268,25 @@ impl OpteeChannel {
             resp_buf.truncate(resp_size);
             debug!("execute_single: {} bytes response", resp_size);
             Ok(resp_buf)
+        }
+    }
+
+    /// Invoke `cmd` with `input` and no output. Returns the TEEC result code on failure.
+    pub fn invoke_with_input(&mut self, cmd: u32, input: &[u8]) -> Result<(), u32> {
+        // SAFETY: the operation only points to `input`, which outlives the call.
+        unsafe {
+            let mut return_origin = 0u32;
+            let mut op: TEEC_Operation = std::mem::zeroed();
+            op.paramTypes = param_types(TEEC_MEMREF_TEMP_INPUT, TEEC_NONE, TEEC_NONE, TEEC_NONE);
+            op.params[0].tmpref.buffer = input.as_ptr() as *mut _;
+            op.params[0].tmpref.size = input.len();
+
+            let result = TEEC_InvokeCommand(&mut self.session, cmd, &mut op, &mut return_origin);
+            if result != TEEC_SUCCESS {
+                error!("TEEC_InvokeCommand({cmd:#x}) failed: 0x{result:08x} (origin: {return_origin})");
+                return Err(result);
+            }
+            Ok(())
         }
     }
 }
