@@ -37,9 +37,10 @@ driver program that:
 
 **Checklist:**
 
-- [ ] Implementation of `main` equivalent for TA, handling scheduling of incoming requests.
+- [x] Implementation of `main` equivalent for TA, handling scheduling of incoming requests.
 - [x] Implementation of communication channel between HAL service and TA.
-- [ ] Implementation of mechanism to retrieve HMAC key (see next section).
+- [x] Implementation of mechanism to retrieve HMAC key (see next section).
+  (from the KeyMint TA, first way of the next section: `src/crypto/authkey.rs`)
 
 The <a
 href="https://android.googlesource.com/trusty/app/gatekeeper/+/refs/heads/main/rust/">Trusty-specific
@@ -69,12 +70,12 @@ an external implementation is not required (but can be provided if desired).
 
 **Checklist:**
 
-- [ ] RNG implementation: `Rng`.
-- [ ] Constant time comparison implementation: `ConstTimeEq`.
-- [ ] Secure time implementation (monotonic, shared with authenticators): `MonotonicClock`.
-- [ ] Implementation of mechanism to retrieve password key: `PasswordKeyRetrieval`
-- [ ] Persistent secure storage of failure records: `FailureRecording`
-   - [ ] The TA code includes one implementation of the `FailureRecording` trait, based on an
+- [x] RNG implementation: `Rng`.
+- [x] Constant time comparison implementation: `ConstTimeEq`.
+- [x] Secure time implementation (monotonic, shared with authenticators): `MonotonicClock`.
+- [x] Implementation of mechanism to retrieve password key: `PasswordKeyRetrieval`
+- [x] Persistent secure storage of failure records: `FailureRecording`
+   - [x] The TA code includes one implementation of the `FailureRecording` trait, based on an
          implementation of a trait for accessing files in a secure filesystem: `SecureFilesystem`
 
 BoringSSL-based implementations are available for some of the above, in the `boringssl/` directory.

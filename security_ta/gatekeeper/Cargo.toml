@@ -38,8 +38,7 @@ optee-ta-common = { path = "../common" }
 optee-utee = { path = "../../../../../external/rust/teaclave-trustzone-sdk/optee-utee", default-features = false }
 optee-utee-sys = { path = "../../../../../external/rust/teaclave-trustzone-sdk/optee-utee/optee-utee-sys", default-features = false }
 spin = { version = "0.10", default-features = false, features = ["once", "mutex", "spin_mutex"] }
-# zeroize is used transitively by gk-ta; do not re-add as a direct dependency
-# unless this crate directly imports it.
+zeroize = "^1.5.6"
 
 [patch.crates-io]
 # Builds are offline: every crates.io dependency is taken from the AOSP tree.

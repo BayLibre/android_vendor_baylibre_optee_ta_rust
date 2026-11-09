@@ -244,6 +244,7 @@ dependencies = [
  "optee-utee",
  "optee-utee-sys",
  "spin",
+ "zeroize",
 ]
 
 [[package]]

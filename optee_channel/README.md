@@ -116,7 +116,7 @@ The sizes on both sides must stay consistent:
 | Max request (HAL `MAX_SIZE`) | 8000 | 4000 |
 | Max request (TA) | 8000 (`GK_MAX_BUFFER_LENGTH`) | 4096 (`KEYMINT_MAX_BUFFER_LENGTH`) |
 | Response buffer (channel) | 4096 (`GK_RESPONSE_MAX`) | 4096 per chunk (`CMD_READ_CHUNK_SIZE`) |
-| Max response (TA) | n/a | 4000 per chunk, signal byte included (`KEYMINT_MAX_MESSAGE_CONTENT_SIZE`) |
+| Max response (TA) | 4096 (`GK_MAX_MESSAGE_CONTENT_SIZE`) | 4000 per chunk, signal byte included (`KEYMINT_MAX_MESSAGE_CONTENT_SIZE`) |
 
 ## Secure World
 
