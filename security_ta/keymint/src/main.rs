@@ -92,7 +92,7 @@ fn keymint_ta() -> &'static Mutex<SingleThreadedTa> {
             kmr_ta::device::Implementation {
                 keys: Box::new(keys::Keys),
                 sign_info: None,
-                attest_ids: None,
+                attest_ids: Some(Box::new(storage::attest_ids::AttestationIds)),
                 sdd_mgr: Some(Box::new(storage::sdsm::SecureDeletionSecretManager::new())),
                 bootloader: Box::new(kmr_ta::device::BootloaderDone),
                 sk_wrapper: None,
@@ -186,6 +186,7 @@ fn invoke_command(
     match cmd_id {
         command::WRITE => handle_ipc_request(sess_ctx, params),
         command::READ => handle_ipc_response(sess_ctx, params),
+        command::SET_ATTESTATION_IDS => handle_set_attestation_ids(params),
         _ => Err(Error::new(ErrorKind::NotSupported)),
     }
 }
@@ -253,4 +254,22 @@ fn handle_ipc_response(keymint_ctx: &mut SessionContext, params: &mut Parameters
     } else {
         Err(Error::new(ErrorKind::BadParameters))
     }
+}
+
+/// Provision the attestation IDs, once: fails with `AccessConflict` if they
+/// were already provisioned.
+fn handle_set_attestation_ids(params: &mut Parameters) -> Result<()> {
+    use kmr_common::wire::{AsCborValue, SetAttestationIdsRequest};
+
+    if params.0.raw().is_null() {
+        return Err(Error::new(ErrorKind::BadParameters));
+    }
+    // SAFETY: as_memref() dereferences the raw TEE_Param pointer, which is non-null.
+    let mut p = unsafe { params.0.as_memref()? };
+    if !matches!(p.param_type(), ParamType::MemrefInput) || p.buffer().len() > KEYMINT_MAX_BUFFER_LENGTH {
+        return Err(Error::new(ErrorKind::BadParameters));
+    }
+    let req = SetAttestationIdsRequest::from_slice(p.buffer())
+        .map_err(|_| Error::new(ErrorKind::BadParameters))?;
+    storage::attest_ids::provision(req.ids)
 }

@@ -38,6 +38,7 @@ offline in the AOSP tree with the prebuilt toolchains, to work with the HALs of
 | `src/keys.rs` | Root keys, derived from the hardware unique key |
 | `src/rpc.rs` | RKP artefacts (see [Limitations](#limitations)) |
 | `src/storage/sdsm.rs` | Secure deletion secret manager (rollback-resistant keys) |
+| `src/storage/attest_ids.rs` | Attestation IDs, provisioned once |
 | `src/error.rs` | OP-TEE to KeyMint error mapping |
 | `src/ta.aarch64.lds`, `src/ta.syms` | Linker script and exported symbols |
 | `Makefile` | cargo build, strip and signature (see [Build](#build)) |
@@ -77,6 +78,7 @@ ML-DSA (V5) is not supported (`NoOpMlDsa`).
 |---------|----|--------|------------|
 | `WRITE` | 1024 | HAL | param[0] MEMREF_INPUT: serialized request (max 4096 bytes) |
 | `READ` | 1025 | HAL | param[0] MEMREF_OUTPUT: next response chunk |
+| `SET_ATTESTATION_IDS` | 0x10001 | Provisioning tool | param[0] MEMREF_INPUT: CBOR `SetAttestationIdsRequest`. `ACCESS_CONFLICT` if already provisioned |
 
 ### HAL <-> TA Protocol
 
@@ -117,7 +119,7 @@ Core API (`optee-utee`), no BoringSSL:
 |--------------------------|----------------|
 | `RetrieveKeyMaterial` | Root KEK and KAK derived from the hardware unique key via `PTA_SYSTEM_DERIVE_TA_UNIQUE_KEY` (`src/keys.rs`). The agreed HMAC key is kept by kmr-ta |
 | `RetrieveCertSigningInfo` | Not provided: attestation needs an attestation key from the caller (RKP), otherwise it fails with `ATTESTATION_KEYS_NOT_PROVISIONED` |
-| `RetrieveAttestationIds` | Not provided |
+| `RetrieveAttestationIds` | OP-TEE secure storage (`TEE_STORAGE_PRIVATE_REE`), object `AttestationIds_1`, see [Attestation IDs](#attestation-ids) |
 | `RetrieveRpcArtifacts` | HBK derived from the hardware unique key. No DICE chain, so RKP is not available (`src/rpc.rs`) |
 | `SecureDeletionSecretManager` | OP-TEE secure storage (`TEE_STORAGE_PRIVATE_REE`), object `SecureDeletionSecrets_1` |
 | `BootloaderStatus` | `BootloaderDone` |
@@ -136,6 +138,25 @@ A factory reset does not wipe the full TA secure storage:
       `ro.crypto.metadata_init_delete_all_keys.enabled` is set.
 3. `deleteAllKeys` deletes `SecureDeletionSecrets_1` from the secure storage
    (`/mnt/vendor/persist/tee`), so every existing key blob becomes unusable.
+
+### Attestation IDs
+
+The attestation IDs are provisioned once per device by
+`keymint-optee-provision-ids` (`hardware/baylibre/optee_hal_rust/keymint/provisioning`) with
+`SET_ATTESTATION_IDS`. The TA stores the CBOR-encoded `AttestationIdInfo` in
+`AttestationIds_1`, created without `TEE_DATA_FLAG_OVERWRITE`, so any later
+provisioning fails. `kmr-ta` ignores `SetAttestationIds` requests from the
+HAL, and only logs an error.
+
+Until provisioning, `RetrieveAttestationIds::get_ids()` returns `None`: ID
+attestation fails with `CANNOT_ATTEST_IDS`, and the RKP `DeviceInfo` cannot be
+built. The TA remembers that the IDs are missing until `SET_ATTESTATION_IDS`,
+so that key generation does not read the secure storage each time.
+`destroyAttestationIds` returns `UNIMPLEMENTED`, as the KeyMint AIDL requires
+for this deprecated method. To provision the IDs again on a development
+device, erase the TA secure storage (`/mnt/vendor/persist/tee`) and `/data`.
+`deleteAllKeys` does not delete `AttestationIds_1`, so the IDs survive a
+factory reset.
 
 ## Build
 
@@ -215,7 +236,10 @@ unchanged.
 1. **Secure deletion**: the secrets are stored in REE FS, so root in Android
    can restore an older `SecureDeletionSecrets_1` and recover deleted keys.
    Rollback resistance needs RPMB backed storage.
-2. **Attestation**: there is no factory attestation key
+2. **Attestation IDs**: stored in REE FS, so root in Android can delete the
+   file and provision new IDs. They need RPMB backed storage. Any client of
+   the TA can provision a device that has no IDs yet.
+3. **Attestation**: there is no factory attestation key
    (`RetrieveCertSigningInfo`), so the device is RKP-only, and no DICE chain
    until the DICE PTA is available, so RKP cannot provision it:
    `generateCertificateRequest` fails, and `fused` is `false`. Key
@@ -228,12 +252,12 @@ unchanged.
    `CertificateRequestV2Test` tests `EmptyRequest`, `NonEmptyRequest`,
    `NonEmptyRequestMultipleKeys`, `NonEmptyRequestReproducible` and
    `DeviceInfo` fail.
-3. **Root of Trust**: nothing sends the boot info yet. kmr-ta expects it from
+4. **Root of Trust**: nothing sends the boot info yet. kmr-ta expects it from
    the bootloader through a channel that Android cannot subvert, which this
    device does not provide, so it fails every key operation with
    `HARDWARE_NOT_YET_AVAILABLE`.
-4. **NIST key import**: a P-224/256/384/521 private key without its
+5. **NIST key import**: a P-224/256/384/521 private key without its
    optional public key (RFC 5915) is rejected with `INVALID_ARGUMENT`, as
    the GP API cannot compute the public key.
-5. **Signing key**: the TA is signed with the OP-TEE default development key.
+6. **Signing key**: the TA is signed with the OP-TEE default development key.
    Production devices need their own `TA_SIGN_KEY`.
