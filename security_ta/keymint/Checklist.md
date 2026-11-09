@@ -111,7 +111,8 @@ writing from Android userspace.
 
 - [x] Secure time implementation (monotonic, shared with authenticators): `kmr_common::crypto::MonotonicClock`.
 - [x] Root key(s) retrieval implementation: `RetrieveKeyMaterial`.
-- [ ] Attestation key / chain retrieval implementation (optional): `RetrieveCertSigningInfo`.
+- [x] Attestation key / chain retrieval implementation (optional): `RetrieveCertSigningInfo`.
+  (AOSP software attestation keys, for development only)
 - [x] Attestation device ID retrieval implementation: `RetrieveAttestationIds`.
 - [x] Retrieval of BCC and DICE artefacts: `RetrieveRpcArtifacts`.
   (DICE chain emulated in the TA, `src/rpc.rs`)

@@ -26,6 +26,7 @@ mod crypto;
 mod error;
 mod keys;
 mod rpc;
+mod software;
 mod storage;
 #[path = "../../common/stubs.rs"]
 mod stubs;
@@ -91,7 +92,7 @@ fn keymint_ta() -> &'static Mutex<SingleThreadedTa> {
             },
             kmr_ta::device::Implementation {
                 keys: Box::new(keys::Keys),
-                sign_info: None,
+                sign_info: Some(Box::new(software::attest::CertSignInfo::new())),
                 attest_ids: Some(Box::new(storage::attest_ids::AttestationIds)),
                 sdd_mgr: Some(Box::new(storage::sdsm::SecureDeletionSecretManager::new())),
                 bootloader: Box::new(kmr_ta::device::BootloaderDone),

@@ -38,6 +38,7 @@ offline in the AOSP tree with the prebuilt toolchains, to work with the HALs of
 | `src/crypto/` | `kmr_common::crypto` trait implementations on top of the GP TEE Internal Core API |
 | `src/keys.rs` | Root keys, derived from the hardware unique key |
 | `src/rpc.rs` | RKP artefacts (see [Limitations](#limitations)) |
+| `src/software/` | Software attestation keys (see [Limitations](#limitations)) |
 | `src/storage/sdsm.rs` | Secure deletion secret manager (rollback-resistant keys) |
 | `src/storage/attest_ids.rs` | Attestation IDs, provisioned once |
 | `src/error.rs` | OP-TEE to KeyMint error mapping |
@@ -142,7 +143,7 @@ Core API (`optee-utee`), no BoringSSL:
 | Trait (`kmr_ta::device`) | Implementation |
 |--------------------------|----------------|
 | `RetrieveKeyMaterial` | Root KEK and KAK derived from the hardware unique key via `PTA_SYSTEM_DERIVE_TA_UNIQUE_KEY` (`src/keys.rs`). The agreed HMAC key is kept by kmr-ta |
-| `RetrieveCertSigningInfo` | Not provided: attestation needs an attestation key from the caller (RKP), otherwise it fails with `ATTESTATION_KEYS_NOT_PROVISIONED` |
+| `RetrieveCertSigningInfo` | Hard-coded RSA and EC software attestation keys/certs (`src/software/attest.rs`) |
 | `RetrieveAttestationIds` | OP-TEE secure storage (`TEE_STORAGE_PRIVATE_REE`), object `AttestationIds_1`, see [Attestation IDs](#attestation-ids) |
 | `RetrieveRpcArtifacts` | DICE chain generated in the TA from an Ed25519 key derived from the HBK (`src/rpc.rs`) |
 | `SecureDeletionSecretManager` | OP-TEE secure storage (`TEE_STORAGE_PRIVATE_REE`), object `SecureDeletionSecrets_1` |
@@ -258,24 +259,23 @@ unchanged.
 
 ## Limitations
 
-1. **Secure deletion**: the secrets are stored in REE FS, so root in Android
+1. **Attestation keys**: the software attestation keys and certificates from
+   `system/keymaster` are used. Production devices need factory provisioned
+   keys.
+2. **Secure deletion**: the secrets are stored in REE FS, so root in Android
    can restore an older `SecureDeletionSecrets_1` and recover deleted keys.
    Rollback resistance needs RPMB backed storage.
-2. **Attestation IDs**: stored in REE FS, so root in Android can delete the
+3. **Attestation IDs**: stored in REE FS, so root in Android can delete the
    file and provision new IDs. They need RPMB backed storage. Any client of
    the TA can provision a device that has no IDs yet.
-3. **Attestation**: there is no factory attestation key
-   (`RetrieveCertSigningInfo`), so the device is RKP-only. The DICE chain is
-   generated in the TA rather than provided by the boot chain, and `fused`
-   is `false`. Key attestation works only with an attestation key provided
-   by the caller, and fails with `ATTESTATION_KEYS_NOT_PROVISIONED`
-   otherwise.
-4. **Root of Trust**: nothing sends the boot info yet. kmr-ta expects it from
+4. **RKP**: the DICE chain is generated in the TA rather than provided by the
+   boot chain, and `fused` is `false`.
+5. **Root of Trust**: nothing sends the boot info yet. kmr-ta expects it from
    the bootloader through a channel that Android cannot subvert, which this
    device does not provide, so it fails every key operation with
    `HARDWARE_NOT_YET_AVAILABLE`.
-5. **NIST key import**: a P-224/256/384/521 private key without its
+6. **NIST key import**: a P-224/256/384/521 private key without its
    optional public key (RFC 5915) is rejected with `INVALID_ARGUMENT`, as
    the GP API cannot compute the public key.
-6. **Signing key**: the TA is signed with the OP-TEE default development key.
+7. **Signing key**: the TA is signed with the OP-TEE default development key.
    Production devices need their own `TA_SIGN_KEY`.
