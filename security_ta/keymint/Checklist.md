@@ -68,8 +68,8 @@ KeyMint supports auth-bound keys that can only be used when an appropriate hardw
 token (HAT) is presented. Secure authenticators such as Gatekeeper or Fingerprint produce these
 HATs, and validation of them requires that:
 
-- [ ] KeyMint and the authenticators share a common monotonic time source.
-- [ ] The authenticators have access to the (per-boot) HMAC signing key, via one of:
+- [x] KeyMint and the authenticators share a common monotonic time source.
+- [x] The authenticators have access to the (per-boot) HMAC signing key, via one of:
    - [x] The authenticator retrieves the HMAC key from KeyMint via a communication mechanism that is
          completely internal to the secure environment, using `KeyMintTa::get_hmac_key`, or
    - [ ] The authenticator also implements the `ISharedSecret` HAL, and joins in the HMAC key
