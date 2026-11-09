@@ -21,3 +21,7 @@ pub const WRITE: u32 = 1024;
 
 // param[0]: output, next response chunk
 pub const READ: u32 = 1025;
+
+// Used by the provisioning tool, once per device.
+// param[0]: input, CBOR-encoded kmr_wire::SetAttestationIdsRequest
+pub const SET_ATTESTATION_IDS: u32 = 0x10001;

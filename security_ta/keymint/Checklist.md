@@ -112,7 +112,7 @@ writing from Android userspace.
 - [x] Secure time implementation (monotonic, shared with authenticators): `kmr_common::crypto::MonotonicClock`.
 - [x] Root key(s) retrieval implementation: `RetrieveKeyMaterial`.
 - [ ] Attestation key / chain retrieval implementation (optional): `RetrieveCertSigningInfo`.
-- [ ] Attestation device ID retrieval implementation: `RetrieveAttestationIds`.
+- [x] Attestation device ID retrieval implementation: `RetrieveAttestationIds`.
 - [ ] Retrieval of BCC and DICE artefacts: `RetrieveRpcArtifacts`.
   (HBK derivation only: no DICE chain until the DICE PTA is available)
 - [x] Secure secret storage (for rollback-resistant keys) implementation (optional): `SecureDeletionSecretManager`.
