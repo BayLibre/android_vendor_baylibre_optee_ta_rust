@@ -25,6 +25,7 @@ mod crypto;
 mod error;
 mod keys;
 mod rpc;
+mod storage;
 #[path = "../../rust/stubs.rs"]
 mod stubs;
 
@@ -92,7 +93,7 @@ fn keymint_ta() -> &'static Mutex<SingleThreadedTa> {
                 keys: Box::new(keys::Keys),
                 sign_info: None,
                 attest_ids: None,
-                sdd_mgr: None,
+                sdd_mgr: Some(Box::new(storage::sdsm::SecureDeletionSecretManager::new())),
                 bootloader: Box::new(kmr_ta::device::BootloaderDone),
                 sk_wrapper: None,
                 tup: Box::new(kmr_ta::device::TrustedPresenceUnsupported),
