@@ -1,0 +1,89 @@
+#
+# Copyright (C) 2024 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[package]
+name = "ta"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["log-warn"]
+# Log level features - only one should be enabled
+log-off = []
+log-warn = []
+log-info = []
+log-debug = []
+log-trace = []
+
+[dependencies]
+gk-ta = "*"
+gk-wire = "*"
+hal-wire = "*"
+log = "0.4"
+optee-ipc-ta = { path = "../../optee_channel/optee-ipc-ta" }
+optee-logger-ta = { path = "../../optee_channel/optee-logger-ta" }
+optee-ta-common = { path = "../common" }
+optee-utee = { path = "../../../../../external/rust/teaclave-trustzone-sdk/optee-utee", default-features = false }
+optee-utee-sys = { path = "../../../../../external/rust/teaclave-trustzone-sdk/optee-utee/optee-utee-sys", default-features = false }
+spin = { version = "0.10", default-features = false, features = ["once", "mutex", "spin_mutex"] }
+# zeroize is used transitively by gk-ta; do not re-add as a direct dependency
+# unless this crate directly imports it.
+
+[patch.crates-io]
+# Builds are offline: every crates.io dependency is taken from the AOSP tree.
+# Use local AOSP system/gatekeeper from manifest
+gk-ta = { path = "../../../../../system/gatekeeper/rust/ta" }
+gk-wire = { path = "../../../../../system/gatekeeper/rust/wire" }
+hal-wire = { path = "../../../../../system/security/hals/wire" }
+hal-wire-derive = { path = "../../../../../system/security/hals/derive" }
+# Crates not vendored in AOSP
+crunchy = { path = "../../../../../external/rust/crates/crunchy" }
+libc_alloc = { path = "../../../../../external/rust/crates/libc_alloc" }
+rustc_version = { path = "../../../../../external/rust/crates/rustc_version" }
+# Crates vendored in AOSP external/rust/android-crates-io
+bitflags = { path = "../../../../../external/rust/android-crates-io/crates/bitflags" }
+ciborium = { path = "../../../../../external/rust/android-crates-io/crates/ciborium" }
+ciborium-io = { path = "../../../../../external/rust/android-crates-io/crates/ciborium-io" }
+ciborium-ll = { path = "../../../../../external/rust/android-crates-io/crates/ciborium-ll" }
+enumn = { path = "../../../../../external/rust/android-crates-io/crates/enumn" }
+half = { path = "../../../../../external/rust/android-crates-io/crates/half" }
+heck = { path = "../../../../../external/rust/android-crates-io/crates/heck" }
+hex = { path = "../../../../../external/rust/android-crates-io/crates/hex" }
+log = { path = "../../../../../external/rust/android-crates-io/crates/log" }
+proc-macro2 = { path = "../../../../../external/rust/android-crates-io/crates/proc-macro2" }
+quote = { path = "../../../../../external/rust/android-crates-io/crates/quote" }
+semver = { path = "../../../../../external/rust/android-crates-io/crates/semver" }
+serde = { path = "../../../../../external/rust/android-crates-io/crates/serde" }
+serde_core = { path = "../../../../../external/rust/android-crates-io/crates/serde_core" }
+serde_derive = { path = "../../../../../external/rust/android-crates-io/crates/serde_derive" }
+spin = { path = "../../../../../external/rust/android-crates-io/crates/spin" }
+strum_macros = { path = "../../../../../external/rust/android-crates-io/crates/strum_macros" }
+syn = { path = "../../../../../external/rust/android-crates-io/crates/syn" }
+unicode-ident = { path = "../../../../../external/rust/android-crates-io/crates/unicode-ident" }
+uuid = { path = "../../../../../external/rust/android-crates-io/crates/uuid" }
+zeroize = { path = "../../../../../external/rust/android-crates-io/crates/zeroize" }
+zeroize_derive = { path = "../../../../../external/rust/android-crates-io/crates/zeroize_derive" }
+
+[profile.release]
+panic = "abort"
+lto = true
+opt-level = 3
+codegen-units = 1
+
+[profile.dev]
+panic = "abort"
+opt-level = 0
+debug = true
+lto = false
