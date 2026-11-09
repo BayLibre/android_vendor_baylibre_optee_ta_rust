@@ -31,6 +31,8 @@ offline in the AOSP tree with the prebuilt toolchains, to work with the HALs of
 | `src/main.rs` | TA entry points, command dispatch |
 | `src/command.rs` | Command IDs |
 | `src/config.rs` | TA header and properties (UUID, flags, stack/heap size) |
+| `src/crypto/` | `kmr_common::crypto` trait implementations on top of the GP TEE Internal Core API |
+| `src/error.rs` | OP-TEE to KeyMint error mapping |
 | `src/ta.aarch64.lds`, `src/ta.syms` | Linker script and exported symbols |
 | `Makefile` | cargo build, strip and signature (see [Build](#build)) |
 | `Android.mk` | AOSP module of the signed TA |
@@ -42,6 +44,7 @@ Shared with the Gatekeeper TA:
 |------|-------------|
 | `../rust/stubs.rs` | Symbols expected by the Rust runtime in a `no_std` TA (`getauxval`, `bcmp`, unwinding stubs) |
 | `../rust/const-oid` | `const-oid` 0.9 shim over AOSP's `const-oid` 0.10 (see [Crates](#crates)) |
+| `../../optee_channel/optee-ipc-ta` | System PTA calls (key derivation, RNG entropy) |
 | `../../optee_channel/optee-logger-ta` | `log` backend printing through the OP-TEE trace API |
 
 ## TA Configuration
@@ -76,6 +79,27 @@ The HAL side of this protocol is `OpteeChannel::execute()`, see
 
 `kmr-ta` also needs the device-specific trait implementations. Until they are
 added, the TA answers every request with `UNIMPLEMENTED`.
+
+## Device-Specific Implementations
+
+### Cryptographic Abstractions
+
+All `kmr_common::crypto` traits are implemented with OP-TEE's GP TEE Internal
+Core API (`optee-utee`), no BoringSSL:
+
+| Trait | Implementation |
+|-------|----------------|
+| `Rng` | `TEE_GenerateRandom`. `add_entropy` forwards to the system PTA (`PTA_SYSTEM_ADD_RNG_ENTROPY`) |
+| `ConstTimeEq` | `TEE_MemCompare` (constant time in OP-TEE) |
+| `MonotonicClock` | `TEE_GetSystemTime`. The TA refuses to start if `gpd.tee.systemTime.protectionLevel` is below 1000 |
+| `Aes` | ECB, CBC, CTR, GCM |
+| `Des` | 3DES ECB, CBC |
+| `Hmac`, `Hkdf` | HMAC with MD5, SHA-1, SHA-224/256/384/512 |
+| `AesCmac` / `Ckdf` | AES-CMAC |
+| `Rsa` | Key generation, signing, decryption |
+| `Ec` | NIST P-224/256/384/521, Ed25519, X25519 (key encoding via the `sec1`/`pkcs8` crates, Ed25519 signing and public key recomputation via `ed25519-dalek`, X25519 public key recomputation via `x25519-dalek`). ECDH peer points are checked to be on the curve with the GP arithmetic API (`crypto/nist_point.rs`) |
+| `Sha256` | SHA-256 |
+| `MlDsa` | Not supported (`NoOpMlDsa`) |
 
 ## Build
 
@@ -152,5 +176,8 @@ unchanged.
 
 ## Limitations
 
-1. **Signing key**: the TA is signed with the OP-TEE default development key.
+1. **NIST key import**: a P-224/256/384/521 private key without its
+   optional public key (RFC 5915) is rejected with `INVALID_ARGUMENT`, as
+   the GP API cannot compute the public key.
+2. **Signing key**: the TA is signed with the OP-TEE default development key.
    Production devices need their own `TA_SIGN_KEY`.
