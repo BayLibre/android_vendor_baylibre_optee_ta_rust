@@ -39,9 +39,11 @@ program that:
 
 **Checklist:**
 
-- [ ] Implementation of `main` equivalent for TA, handling scheduling of incoming requests.
+- [x] Implementation of `main` equivalent for TA, handling scheduling of incoming requests.
 - [x] Implementation of communication channel between HAL service and TA.
 - [ ] Implementation of communication channel from bootloader to TA.
+  (not implemented: nothing sends the boot info yet, so key operations fail
+  with `HARDWARE_NOT_YET_AVAILABLE`)
     - [ ] Trigger call to `kmr_ta::KeyMintTa::set_boot_info` on receipt of boot info.
 
 The Cuttlefish implementation of the [KeyMint/Rust
@@ -108,10 +110,11 @@ writing from Android userspace.
 **Checklist:**
 
 - [x] Secure time implementation (monotonic, shared with authenticators): `kmr_common::crypto::MonotonicClock`.
-- [ ] Root key(s) retrieval implementation: `RetrieveKeyMaterial`.
+- [x] Root key(s) retrieval implementation: `RetrieveKeyMaterial`.
 - [ ] Attestation key / chain retrieval implementation (optional): `RetrieveCertSigningInfo`.
 - [ ] Attestation device ID retrieval implementation: `RetrieveAttestationIds`.
 - [ ] Retrieval of BCC and DICE artefacts: `RetrieveRpcArtifacts`.
+  (HBK derivation only: no DICE chain until the DICE PTA is available)
 - [ ] Secure secret storage (for rollback-resistant keys) implementation (optional): `SecureDeletionSecretManager`.
 - [ ] Bootloader status retrieval (optional): `BootloaderStatus`.
 - [ ] Storage key wrapping integration (optional): `StorageKeyWrapper`.
