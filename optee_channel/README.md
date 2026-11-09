@@ -51,7 +51,7 @@ Each HAL wraps `OpteeChannel` in a local newtype implementing the
 `SerializedChannel` trait of its HAL library (`gk_hal` or `kmr_hal`): the trait
 and the type are both foreign to the HAL crate, so the orphan rule requires the
 implementation to live there. The HAL also sets `SerializedChannel::MAX_SIZE`
-and picks the execution mode matching its TA.
+and picks one of the two execution modes below.
 
 Requests and responses are opaque byte buffers for the channel: the CBOR
 encoding (`gk-wire`, `kmr-wire`) is handled by the HAL and TA libraries.
@@ -67,6 +67,23 @@ One `TEEC_InvokeCommand` per request:
 The response size is read back from param[1]. A response larger than the
 buffer is reported as an error.
 
+#### Split Write/Read: `execute()` (KeyMint)
+
+KeyMint responses can be larger than a single shared memory buffer, so the
+request and the response are carried by separate commands:
+
+| Command | ID | param[0] |
+|---------|----|----------|
+| `WRITE` | 1024 | MEMREF_TEMP_INPUT: request |
+| `READ` | 1025 | MEMREF_TEMP_OUTPUT: one response chunk (4096-byte buffer) |
+
+1. `WRITE` sends the whole request. The TA processes it and queues the response
+   chunks.
+2. `READ` is called until the end of the response. Each chunk starts with a
+   signal byte, `1` if more chunks follow and `0` for the last one, followed by
+   the chunk data. `TEEC_ERROR_NO_DATA` also ends the response.
+3. The chunk data are concatenated into the response.
+
 #### Error Handling
 
 Errors are returned to the HAL, which turns them into a binder
@@ -76,3 +93,14 @@ There is no reconnect on `TEEC_ERROR_TARGET_DEAD` (the TA panicked or was
 unloaded). A dead TA lost its state, such as the KeyMint HAL info and shared
 secret, which a new session can't restore. Every later call fails, until the
 device reboots.
+
+### Size Constraints
+
+The sizes on both sides must stay consistent:
+
+| | Gatekeeper | KeyMint |
+|-|------------|---------|
+| Max request (HAL `MAX_SIZE`) | 8000 | 4000 |
+| Max request (TA) | 8000 (`GK_MAX_BUFFER_LENGTH`) | 4096 (`KEYMINT_MAX_BUFFER_LENGTH`) |
+| Response buffer (channel) | 4096 (`GK_RESPONSE_MAX`) | 4096 per chunk (`CMD_READ_CHUNK_SIZE`) |
+| Max response (TA) | n/a | 4000 per chunk, signal byte included (`KEYMINT_MAX_MESSAGE_CONTENT_SIZE`) |
