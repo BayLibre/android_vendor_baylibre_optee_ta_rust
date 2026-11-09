@@ -115,7 +115,7 @@ writing from Android userspace.
 - [ ] Attestation device ID retrieval implementation: `RetrieveAttestationIds`.
 - [ ] Retrieval of BCC and DICE artefacts: `RetrieveRpcArtifacts`.
   (HBK derivation only: no DICE chain until the DICE PTA is available)
-- [ ] Secure secret storage (for rollback-resistant keys) implementation (optional): `SecureDeletionSecretManager`.
+- [x] Secure secret storage (for rollback-resistant keys) implementation (optional): `SecureDeletionSecretManager`.
 - [ ] Bootloader status retrieval (optional): `BootloaderStatus`.
 - [ ] Storage key wrapping integration (optional): `StorageKeyWrapper`.
 - [ ] Trusted user presence indication (optional): `TrustedUserPresence`.
