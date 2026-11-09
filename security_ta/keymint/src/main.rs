@@ -19,6 +19,7 @@
 #[macro_use]
 extern crate alloc;
 
+mod client_id;
 mod command;
 mod config;
 mod crypto;
@@ -32,6 +33,7 @@ mod stubs;
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
+use client_id::ClientId;
 use core::ffi::c_void;
 use log::info;
 use optee_utee::{ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session};
@@ -182,6 +184,7 @@ fn invoke_command(
     params: &mut Parameters,
 ) -> Result<()> {
     match cmd_id {
+        command::GET_AUTH_TOKEN_KEY => handle_authtoken_key_request(sess_ctx, params),
         command::WRITE => handle_ipc_request(sess_ctx, params),
         command::READ => handle_ipc_response(sess_ctx, params),
         command::SET_ATTESTATION_IDS => handle_set_attestation_ids(params),
@@ -224,6 +227,20 @@ fn handle_ipc_response(keymint_ctx: &mut SessionContext, params: &mut Parameters
     Ok(())
 }
 
+fn client_is_gatekeeper_ta() -> bool {
+    let gk = optee_ta_common::GATEKEEPER_TA_UUID;
+    match ClientId::detect() {
+        // TEE_UUID doesn't implement PartialEq.
+        ClientId::TA(uuid) => {
+            uuid.timeLow == gk.timeLow
+                && uuid.timeMid == gk.timeMid
+                && uuid.timeHiAndVersion == gk.timeHiAndVersion
+                && uuid.clockSeqAndNode == gk.clockSeqAndNode
+        }
+        ClientId::Other => false,
+    }
+}
+
 /// Provision the attestation IDs, once: fails with `AccessConflict` if they
 /// were already provisioned.
 fn handle_set_attestation_ids(params: &mut Parameters) -> Result<()> {
@@ -233,4 +250,20 @@ fn handle_set_attestation_ids(params: &mut Parameters) -> Result<()> {
     let req = SetAttestationIdsRequest::from_slice(&req)
         .map_err(|_| Error::new(ErrorKind::BadParameters))?;
     storage::attest_ids::provision(req.ids)
+}
+
+fn handle_authtoken_key_request(
+    _keymint_ctx: &mut SessionContext,
+    params: &mut Parameters,
+) -> Result<()> {
+    if !client_is_gatekeeper_ta() {
+        return Err(Error::new(ErrorKind::AccessDenied));
+    }
+
+    // Key agreed through ISharedSecret, None until the negotiation has run.
+    let hmac_key = match keymint_ta().lock().0.get_hmac_key() {
+        Some(key) => key,
+        None => return Err(Error::new(ErrorKind::BadState)),
+    };
+    optee_ta_common::write_output(&mut params.1, hmac_key.0.as_slice())
 }

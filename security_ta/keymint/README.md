@@ -34,6 +34,7 @@ offline in the AOSP tree with the prebuilt toolchains, to work with the HALs of
 | `src/main.rs` | TA entry points, `KeyMintTa` singleton, command dispatch |
 | `src/command.rs` | Command IDs |
 | `src/config.rs` | TA header and properties (UUID, flags, stack/heap size), through `ta_config!` |
+| `src/client_id.rs` | Identifies the calling client (used to authenticate the Gatekeeper TA) |
 | `src/crypto/` | `kmr_common::crypto` trait implementations on top of the GP TEE Internal Core API |
 | `src/keys.rs` | Root keys, derived from the hardware unique key |
 | `src/rpc.rs` | RKP artefacts (see [Limitations](#limitations)) |
@@ -80,6 +81,7 @@ ML-DSA (V5) is not supported (`NoOpMlDsa`).
 |---------|----|--------|------------|
 | `WRITE` | 1024 | HAL | param[0] MEMREF_INPUT: serialized request (max 4096 bytes) |
 | `READ` | 1025 | HAL | param[0] MEMREF_OUTPUT: next response chunk |
+| `GET_AUTH_TOKEN_KEY` | 0x10000 | Gatekeeper TA only | param[1] MEMREF_OUTPUT: 32-byte HMAC key |
 | `SET_ATTESTATION_IDS` | 0x10001 | Provisioning tool | param[0] MEMREF_INPUT: CBOR `SetAttestationIdsRequest`. `ACCESS_CONFLICT` if already provisioned |
 
 ### HAL <-> TA Protocol
@@ -93,6 +95,26 @@ returns `TEE_ERROR_NO_DATA`.
 
 The HAL side of this protocol is `OpteeChannel::execute()`, see
 `vendor/baylibre/optee_ta_rust/optee_channel/README.md`.
+
+### Auth Token Key Sharing with Gatekeeper
+
+`GET_AUTH_TOKEN_KEY` hands the HMAC-SHA256 key used to sign HardwareAuthTokens
+to the Gatekeeper TA, so both components sign/verify tokens with the same key
+(the "retrieve from KeyMint" option of the upstream Gatekeeper *Auth Key
+Retrieval* section).
+The TA checks the caller identity (`gpd.client.identity`) and returns
+`TEE_ERROR_ACCESS_DENIED` unless the client is the Gatekeeper TA
+(`4d573443-6a56-4272-ac6f-2425af9ef9bb`). The command ID is inherited from
+the C TAs. The response is the 32-byte key, which the Gatekeeper TA reads
+in `crypto/authkey.rs`.
+
+`ISharedSecret` is served by KeyMint only. The auth token key is the key `H`
+negotiated through it, kept in memory by kmr-ta (default
+`RetrieveKeyMaterial::hmac_key_agreed()`), so it changes with each KeyMint TA
+instance, i.e. at each boot.
+`GET_AUTH_TOKEN_KEY` returns that key, and `TEE_ERROR_BAD_STATE` until
+Keystore has run the negotiation. The pre-shared key of the negotiation (KAK)
+is derived from the hardware unique key (`"KeymintKeyAgreementKey"`).
 
 ## Device-Specific Implementations
 
