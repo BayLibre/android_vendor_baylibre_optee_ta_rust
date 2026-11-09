@@ -15,6 +15,10 @@
 
 //! KeyMint TA command definitions.
 
+// Gatekeeper TA only, same ID as KM_GET_AUTHTOKEN_KEY of the C TAs.
+// param[1]: output, 32-byte key
+pub const GET_AUTH_TOKEN_KEY: u32 = 0x10000;
+
 // HAL <-> TA protocol, see OpteeChannel::execute().
 // param[0]: input, serialized request
 pub const WRITE: u32 = 1024;
