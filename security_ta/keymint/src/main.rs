@@ -20,6 +20,8 @@ extern crate alloc;
 
 mod command;
 mod config;
+mod crypto;
+mod error;
 #[path = "../../rust/stubs.rs"]
 mod stubs;
 
@@ -81,6 +83,10 @@ fn create() -> Result<()> {
 
     info!("Hello from OP-TEE Keymint in Rust!");
 
+    if !crypto::clock::is_secure_time_source() {
+        return Err(Error::new(ErrorKind::Security));
+    }
+
     Ok(())
 }
 
@@ -113,7 +119,7 @@ fn invoke_command(
     }
 }
 
-/// Not implemented yet: kmr-ta needs the device-specific traits.
+/// Not implemented yet: kmr-ta also needs the device-specific traits.
 fn process(_req: &[u8]) -> Result<Vec<u8>> {
     PerformOpResponse { error_code: ErrorCode::Unimplemented as i32, rsp: None }
         .into_vec()

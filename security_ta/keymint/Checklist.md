@@ -85,14 +85,14 @@ an external implementation is not required (but can be provided if desired).
 
 **Checklist:**
 
-- [ ] RNG implementation: `Rng`.
-- [ ] Constant time comparison implementation: `ConstTimeEq`.
-- [ ] AES implementation: `Aes`.
-- [ ] 3-DES implementation: `Des`.
-- [ ] HMAC implementation: `Hmac`.
-- [ ] RSA implementation: `Rsa`.
-- [ ] EC implementation, including curve 25519 support: `Ec`.
-- [ ] AES-CMAC or CKDF implementation: `AesCmac`, `Ckdf`.
+- [x] RNG implementation: `Rng`.
+- [x] Constant time comparison implementation: `ConstTimeEq`.
+- [x] AES implementation: `Aes`.
+- [x] 3-DES implementation: `Des`.
+- [x] HMAC implementation: `Hmac`.
+- [x] RSA implementation: `Rsa`.
+- [x] EC implementation, including curve 25519 support: `Ec`.
+- [x] AES-CMAC or CKDF implementation: `AesCmac`, `Ckdf`.
 
 BoringSSL-based implementations are available for all of the above.
 
@@ -107,7 +107,7 @@ writing from Android userspace.
 
 **Checklist:**
 
-- [ ] Secure time implementation (monotonic, shared with authenticators): `kmr_common::crypto::MonotonicClock`.
+- [x] Secure time implementation (monotonic, shared with authenticators): `kmr_common::crypto::MonotonicClock`.
 - [ ] Root key(s) retrieval implementation: `RetrieveKeyMaterial`.
 - [ ] Attestation key / chain retrieval implementation (optional): `RetrieveCertSigningInfo`.
 - [ ] Attestation device ID retrieval implementation: `RetrieveAttestationIds`.
