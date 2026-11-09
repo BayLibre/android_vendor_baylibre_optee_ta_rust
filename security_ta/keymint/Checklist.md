@@ -113,8 +113,8 @@ writing from Android userspace.
 - [x] Root key(s) retrieval implementation: `RetrieveKeyMaterial`.
 - [ ] Attestation key / chain retrieval implementation (optional): `RetrieveCertSigningInfo`.
 - [x] Attestation device ID retrieval implementation: `RetrieveAttestationIds`.
-- [ ] Retrieval of BCC and DICE artefacts: `RetrieveRpcArtifacts`.
-  (HBK derivation only: no DICE chain until the DICE PTA is available)
+- [x] Retrieval of BCC and DICE artefacts: `RetrieveRpcArtifacts`.
+  (DICE chain emulated in the TA, `src/rpc.rs`)
 - [x] Secure secret storage (for rollback-resistant keys) implementation (optional): `SecureDeletionSecretManager`.
 - [ ] Bootloader status retrieval (optional): `BootloaderStatus`.
 - [ ] Storage key wrapping integration (optional): `StorageKeyWrapper`.

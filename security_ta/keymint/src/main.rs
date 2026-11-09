@@ -98,7 +98,9 @@ fn keymint_ta() -> &'static Mutex<SingleThreadedTa> {
                 sk_wrapper: None,
                 tup: Box::new(kmr_ta::device::TrustedPresenceUnsupported),
                 legacy_key: None,
-                rpc: Box::new(rpc::RpcArtifacts),
+                rpc: Box::new(rpc::RpcArtifacts::new(
+                    kmr_ta::device::CsrSigningAlgorithm::EdDSA,
+                )),
             },
             vec![kmr_ta::KeyMintHalVersion::V4, kmr_ta::KeyMintHalVersion::V5],
         );

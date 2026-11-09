@@ -14,7 +14,7 @@ device-specific trait implementations required by `kmr-ta`.
 - **UUID**: `dba51a17-0563-11e7-93b1-6fa7b0071a51`
 - **KeyMint version**: 4 (`HardwareInfo::version_number`)
 - **Security level**: `TrustedEnvironment`
-- **RPC**: `RpcInfo::V3`
+- **RPC**: `RpcInfo::V3`, CSR signed with EdDSA
 - **HAL**: `hardware/baylibre/optee_hal_rust/keymint`
   (`android.hardware.security.keymint-service.optee.rust`)
 
@@ -144,7 +144,7 @@ Core API (`optee-utee`), no BoringSSL:
 | `RetrieveKeyMaterial` | Root KEK and KAK derived from the hardware unique key via `PTA_SYSTEM_DERIVE_TA_UNIQUE_KEY` (`src/keys.rs`). The agreed HMAC key is kept by kmr-ta |
 | `RetrieveCertSigningInfo` | Not provided: attestation needs an attestation key from the caller (RKP), otherwise it fails with `ATTESTATION_KEYS_NOT_PROVISIONED` |
 | `RetrieveAttestationIds` | OP-TEE secure storage (`TEE_STORAGE_PRIVATE_REE`), object `AttestationIds_1`, see [Attestation IDs](#attestation-ids) |
-| `RetrieveRpcArtifacts` | HBK derived from the hardware unique key. No DICE chain, so RKP is not available (`src/rpc.rs`) |
+| `RetrieveRpcArtifacts` | DICE chain generated in the TA from an Ed25519 key derived from the HBK (`src/rpc.rs`) |
 | `SecureDeletionSecretManager` | OP-TEE secure storage (`TEE_STORAGE_PRIVATE_REE`), object `SecureDeletionSecrets_1` |
 | `BootloaderStatus` | `BootloaderDone` |
 | `StorageKeyWrapper` | Not provided |
@@ -265,18 +265,11 @@ unchanged.
    file and provision new IDs. They need RPMB backed storage. Any client of
    the TA can provision a device that has no IDs yet.
 3. **Attestation**: there is no factory attestation key
-   (`RetrieveCertSigningInfo`), so the device is RKP-only, and no DICE chain
-   until the DICE PTA is available, so RKP cannot provision it:
-   `generateCertificateRequest` fails, and `fused` is `false`. Key
-   attestation then works only with an attestation key provided by the
-   caller, and fails with `ATTESTATION_KEYS_NOT_PROVISIONED` otherwise.
-   VTS provides its own attestation keys, so in
-   `VtsAidlKeyMintTargetTest` only `AttestKeyTest.RsaAttestedAttestKeys`
-   is skipped ("RKP-only devices do not have a factory key"). In
-   `VtsHalRemotelyProvisionedComponentTargetTest`, the
-   `CertificateRequestV2Test` tests `EmptyRequest`, `NonEmptyRequest`,
-   `NonEmptyRequestMultipleKeys`, `NonEmptyRequestReproducible` and
-   `DeviceInfo` fail.
+   (`RetrieveCertSigningInfo`), so the device is RKP-only. The DICE chain is
+   generated in the TA rather than provided by the boot chain, and `fused`
+   is `false`. Key attestation works only with an attestation key provided
+   by the caller, and fails with `ATTESTATION_KEYS_NOT_PROVISIONED`
+   otherwise.
 4. **Root of Trust**: nothing sends the boot info yet. kmr-ta expects it from
    the bootloader through a channel that Android cannot subvert, which this
    device does not provide, so it fails every key operation with
