@@ -16,12 +16,15 @@
 #![no_std]
 #![no_main]
 
+#[macro_use]
 extern crate alloc;
 
 mod command;
 mod config;
 mod crypto;
 mod error;
+mod keys;
+mod rpc;
 #[path = "../../rust/stubs.rs"]
 mod stubs;
 
@@ -29,12 +32,79 @@ use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
 use core::ffi::c_void;
-use kmr_wire::{keymint::ErrorCode, AsCborValue, PerformOpResponse};
 use log::info;
 use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session,
 };
 use optee_utee::{Error, ErrorKind, ParamType, Parameters, Result};
+use spin::Mutex;
+use spin::Once;
+
+// SAFETY:
+//
+// Each OP-TEE TA, per GlobalPlatform internal core API spec v1.1+,
+// is essentially a single-threaded environment, in which all TA
+// entry points (create, destroy, open_session, close_session, and
+// invoke_command) are executed sequentially by the TEE OS.
+//
+// Thus it is safe to mark the global `kmr_ta::KeyMintTa` variable
+// as Send.
+//
+// We use spin::Once and spin::Mutex for readability rather than
+// necessity.
+struct SingleThreadedTa(kmr_ta::KeyMintTa);
+unsafe impl Send for SingleThreadedTa {}
+
+fn keymint_ta() -> &'static Mutex<SingleThreadedTa> {
+    static KEYMINT_TA: Once<Mutex<SingleThreadedTa>> = Once::new();
+    KEYMINT_TA.call_once(|| {
+        // Allow the HAL to select KeyMint V4 or V5, as done by the Trusty KeyMint TA
+        let ta = kmr_ta::KeyMintTa::new_allowing_versions(
+            kmr_ta::HardwareInfo {
+                version_number: 4,
+                security_level: kmr_common::wire::keymint::SecurityLevel::TrustedEnvironment,
+                impl_name: "TEE KeyMint in Rust",
+                author_name: "BayLibre",
+                unique_id: "TEE KeyMint TA",
+            },
+            kmr_ta::RpcInfo::V3(kmr_ta::RpcInfoV3 {
+                author_name: "Google",
+                unique_id: "TEE KeyMint TA",
+                fused: false,
+                supported_num_of_keys_in_csr: kmr_wire::rpc::MINIMUM_SUPPORTED_KEYS_IN_CSR,
+            }),
+            kmr_common::crypto::Implementation {
+                rng: Box::new(crypto::rng::Rng),
+                clock: Some(Box::new(crypto::clock::Clock)),
+                compare: Box::new(crypto::eq::Eq),
+                aes: Box::new(crypto::aes::Aes),
+                des: Box::new(crypto::des::Des),
+                hmac: Box::new(crypto::mac::Hmac),
+                rsa: Box::new(crypto::rsa::Rsa),
+                ec: Box::new(crypto::ec::Ec),
+                ckdf: Box::new(crypto::mac::AesCmac),
+                hkdf: Box::new(crypto::mac::Hmac),
+                sha256: Box::new(crypto::sha::Sha256),
+                // ML-DSA (KeyMint V5) is not supported
+                mldsa: Box::new(kmr_common::crypto::NoOpMlDsa),
+            },
+            kmr_ta::device::Implementation {
+                keys: Box::new(keys::Keys),
+                sign_info: None,
+                attest_ids: None,
+                sdd_mgr: None,
+                bootloader: Box::new(kmr_ta::device::BootloaderDone),
+                sk_wrapper: None,
+                tup: Box::new(kmr_ta::device::TrustedPresenceUnsupported),
+                legacy_key: None,
+                rpc: Box::new(rpc::RpcArtifacts),
+            },
+            vec![kmr_ta::KeyMintHalVersion::V4, kmr_ta::KeyMintHalVersion::V5],
+        );
+
+        Mutex::new(SingleThreadedTa(ta))
+    })
+}
 
 // The maximum size of an incoming request.
 const KEYMINT_MAX_BUFFER_LENGTH: usize = 4096;
@@ -119,13 +189,6 @@ fn invoke_command(
     }
 }
 
-/// Not implemented yet: kmr-ta also needs the device-specific traits.
-fn process(_req: &[u8]) -> Result<Vec<u8>> {
-    PerformOpResponse { error_code: ErrorCode::Unimplemented as i32, rsp: None }
-        .into_vec()
-        .map_err(|_| Error::new(ErrorKind::Generic))
-}
-
 fn handle_ipc_request(keymint_ctx: &mut SessionContext, params: &mut Parameters) -> Result<()> {
     if keymint_ctx.ipc_resp.is_some() {
         // The response of the previous IPC has not been cleared.
@@ -146,7 +209,7 @@ fn handle_ipc_request(keymint_ctx: &mut SessionContext, params: &mut Parameters)
         if req.len() > KEYMINT_MAX_BUFFER_LENGTH {
             return Err(Error::new(ErrorKind::Overflow));
         }
-        let resp = process(req)?;
+        let resp = keymint_ta().lock().0.process(req);
         keymint_ctx.ipc_resp = Some(VecDeque::from(
             kmr_ta::split_rsp(resp.as_slice(), KEYMINT_MAX_MESSAGE_CONTENT_SIZE)
                 .map_err(|_| Error::new(ErrorKind::Generic))?,

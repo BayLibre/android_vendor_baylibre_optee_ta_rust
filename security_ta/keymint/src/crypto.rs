@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::error::Error;
+use kmr_common::crypto::RawKeyMaterial;
+use kmr_common::vec_try;
 use kmr_wire::keymint::Digest;
 use optee_utee::AlgorithmId;
 
@@ -38,4 +41,10 @@ fn digest_to_algid(digest: Digest) -> Option<AlgorithmId> {
         Digest::Sha384 => Some(AlgorithmId::Sha384),
         Digest::Sha512 => Some(AlgorithmId::Sha512),
     }
+}
+
+pub fn derive_hbk(input: &[u8], len: usize) -> Result<RawKeyMaterial, kmr_common::Error> {
+    let mut key = vec_try![0u8; len]?;
+    optee_ipc_ta::derive_ta_unique_key(input, &mut key).map_err(Error::kmerr)?;
+    Ok(RawKeyMaterial(key))
 }

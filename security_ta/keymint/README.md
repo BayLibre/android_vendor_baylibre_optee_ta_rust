@@ -12,6 +12,9 @@ device-specific trait implementations required by `kmr-ta`.
 `system/keymint/README.md`.
 
 - **UUID**: `dba51a17-0563-11e7-93b1-6fa7b0071a51`
+- **KeyMint version**: 4 (`HardwareInfo::version_number`)
+- **Security level**: `TrustedEnvironment`
+- **RPC**: `RpcInfo::V3`
 - **HAL**: `hardware/baylibre/optee_hal_rust/keymint`
   (`android.hardware.security.keymint-service.optee.rust`)
 
@@ -28,10 +31,12 @@ offline in the AOSP tree with the prebuilt toolchains, to work with the HALs of
 
 | File | Description |
 |------|-------------|
-| `src/main.rs` | TA entry points, command dispatch |
+| `src/main.rs` | TA entry points, `KeyMintTa` singleton, command dispatch |
 | `src/command.rs` | Command IDs |
 | `src/config.rs` | TA header and properties (UUID, flags, stack/heap size) |
 | `src/crypto/` | `kmr_common::crypto` trait implementations on top of the GP TEE Internal Core API |
+| `src/keys.rs` | Root keys, derived from the hardware unique key |
+| `src/rpc.rs` | RKP artefacts (see [Limitations](#limitations)) |
 | `src/error.rs` | OP-TEE to KeyMint error mapping |
 | `src/ta.aarch64.lds`, `src/ta.syms` | Linker script and exported symbols |
 | `Makefile` | cargo build, strip and signature (see [Build](#build)) |
@@ -58,6 +63,13 @@ Defined in `src/config.rs`:
 - **Stack**: 128 KB
 - **Heap**: 3 MB
 
+OP-TEE runs TA entry points sequentially, even across sessions, so the global
+`KeyMintTa` is kept in a `spin::Once<Mutex<_>>` behind a `Send` wrapper.
+
+`KeyMintTa` is created with `new_allowing_versions()` and accepts the V4 and V5
+HAL versions, as the Trusty KeyMint TA does. The HAL only implements V4, and
+ML-DSA (V5) is not supported (`NoOpMlDsa`).
+
 ## Commands
 
 | Command | ID | Caller | Parameters |
@@ -76,9 +88,6 @@ returns `TEE_ERROR_NO_DATA`.
 
 The HAL side of this protocol is `OpteeChannel::execute()`, see
 `vendor/baylibre/optee_ta_rust/optee_channel/README.md`.
-
-`kmr-ta` also needs the device-specific trait implementations. Until they are
-added, the TA answers every request with `UNIMPLEMENTED`.
 
 ## Device-Specific Implementations
 
@@ -100,6 +109,20 @@ Core API (`optee-utee`), no BoringSSL:
 | `Ec` | NIST P-224/256/384/521, Ed25519, X25519 (key encoding via the `sec1`/`pkcs8` crates, Ed25519 signing and public key recomputation via `ed25519-dalek`, X25519 public key recomputation via `x25519-dalek`). ECDH peer points are checked to be on the curve with the GP arithmetic API (`crypto/nist_point.rs`) |
 | `Sha256` | SHA-256 |
 | `MlDsa` | Not supported (`NoOpMlDsa`) |
+
+### Device Abstractions
+
+| Trait (`kmr_ta::device`) | Implementation |
+|--------------------------|----------------|
+| `RetrieveKeyMaterial` | Root KEK and KAK derived from the hardware unique key via `PTA_SYSTEM_DERIVE_TA_UNIQUE_KEY` (`src/keys.rs`). The agreed HMAC key is kept by kmr-ta |
+| `RetrieveCertSigningInfo` | Not provided: attestation needs an attestation key from the caller (RKP), otherwise it fails with `ATTESTATION_KEYS_NOT_PROVISIONED` |
+| `RetrieveAttestationIds` | Not provided |
+| `RetrieveRpcArtifacts` | HBK derived from the hardware unique key. No DICE chain, so RKP is not available (`src/rpc.rs`) |
+| `SecureDeletionSecretManager` | Not provided |
+| `BootloaderStatus` | `BootloaderDone` |
+| `StorageKeyWrapper` | Not provided |
+| `TrustedUserPresence` | Unsupported |
+| `LegacyKeyHandler` | Not provided |
 
 ## Build
 
@@ -176,8 +199,25 @@ unchanged.
 
 ## Limitations
 
-1. **NIST key import**: a P-224/256/384/521 private key without its
+1. **Attestation**: there is no factory attestation key
+   (`RetrieveCertSigningInfo`), so the device is RKP-only, and no DICE chain
+   until the DICE PTA is available, so RKP cannot provision it:
+   `generateCertificateRequest` fails, and `fused` is `false`. Key
+   attestation then works only with an attestation key provided by the
+   caller, and fails with `ATTESTATION_KEYS_NOT_PROVISIONED` otherwise.
+   VTS provides its own attestation keys, so in
+   `VtsAidlKeyMintTargetTest` only `AttestKeyTest.RsaAttestedAttestKeys`
+   is skipped ("RKP-only devices do not have a factory key"). In
+   `VtsHalRemotelyProvisionedComponentTargetTest`, the
+   `CertificateRequestV2Test` tests `EmptyRequest`, `NonEmptyRequest`,
+   `NonEmptyRequestMultipleKeys`, `NonEmptyRequestReproducible` and
+   `DeviceInfo` fail.
+2. **Root of Trust**: nothing sends the boot info yet. kmr-ta expects it from
+   the bootloader through a channel that Android cannot subvert, which this
+   device does not provide, so it fails every key operation with
+   `HARDWARE_NOT_YET_AVAILABLE`.
+3. **NIST key import**: a P-224/256/384/521 private key without its
    optional public key (RFC 5915) is rejected with `INVALID_ARGUMENT`, as
    the GP API cannot compute the public key.
-2. **Signing key**: the TA is signed with the OP-TEE default development key.
+4. **Signing key**: the TA is signed with the OP-TEE default development key.
    Production devices need their own `TA_SIGN_KEY`.
