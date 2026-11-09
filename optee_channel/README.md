@@ -5,7 +5,7 @@ implementations to talk to and from OP-TEE:
 
 - on the normal world side, the libteec bindings and the HAL <-> TA channel used
   by the HALs in `hardware/baylibre/optee_hal_rust/{gatekeeper,keymint}`;
-- on the secure world side, a `no_std` crate used by the TAs in
+- on the secure world side, two `no_std` crates used by the TAs in
   `vendor/baylibre/optee_ta_rust/security_ta/{gatekeeper,keymint}`.
 
 Google's Rust reference implementations (`system/keymint`,
@@ -18,7 +18,7 @@ that channel goes through OP-TEE's GlobalPlatform TEE Client API.
 ```
 HAL (hardware/baylibre/optee_hal_rust)      TA (vendor/baylibre/optee_ta_rust/security_ta)
     |                                         |
-libtee_optee_channel  -- OpteeChannel
+libtee_optee_channel  -- OpteeChannel         optee-logger-ta  -- log backend
 libtee_optee_bindings -- libteec FFI          optee-ipc-ta     -- TA-to-TA / PTA calls
     |                                         |
 libteec → /dev/tee0 → SMC →  OP-TEE mediator (EL2) →  OP-TEE OS
@@ -31,6 +31,7 @@ libteec → /dev/tee0 → SMC →  OP-TEE mediator (EL2) →  OP-TEE OS
 | `libteec_bindgen.h`, `optee_bindings.rs` | `libtee_client_api_bindgen`, `libtee_optee_bindings` | HAL side |
 | `optee_channel.rs` | `libtee_optee_channel` | Gatekeeper and KeyMint HALs |
 | `optee-ipc-ta/` | cargo crate, `no_std` | Gatekeeper and KeyMint TAs |
+| `optee-logger-ta/` | cargo crate, `no_std` | Gatekeeper and KeyMint TAs |
 
 ## Normal World
 
@@ -113,8 +114,8 @@ The sizes on both sides must stay consistent:
 
 ## Secure World
 
-`optee-ipc-ta` is pulled by the TAs through a `path` dependency in their
-`Cargo.toml` and builds against the Teaclave TrustZone SDK
+Both crates are pulled by the TAs through a `path` dependency in their
+`Cargo.toml` and build against the Teaclave TrustZone SDK
 
 ### `optee-ipc-ta`
 
@@ -127,3 +128,11 @@ Thin wrapper around the TA-to-TA syscalls of the GP TEE Internal Core API
 - the OP-TEE system PTA UUID and commands used by the TAs
   (`PTA_SYSTEM_ADD_RNG_ENTROPY`, `PTA_SYSTEM_DERIVE_TA_UNIQUE_KEY`), and
   `add_rng_entropy()` and `derive_ta_unique_key()`, which call them.
+
+### `optee-logger-ta`
+
+A `log` crate backend printing through OP-TEE's `trace_ext_puts()`, so TA logs
+end up on the OP-TEE console, prefixed with `TA_RUST_<LEVEL>`. Messages are
+truncated to 511 bytes. The maximum level is set at init; the TAs choose it at
+build time with their `log-*` cargo features, selected by their Makefile from
+`CFG_TEE_TA_LOG_LEVEL`.
