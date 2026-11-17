@@ -26,7 +26,7 @@ mod error;
 mod keys;
 mod rpc;
 mod storage;
-#[path = "../../rust/stubs.rs"]
+#[path = "../../common/stubs.rs"]
 mod stubs;
 
 use alloc::boxed::Box;
@@ -34,10 +34,8 @@ use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
 use core::ffi::c_void;
 use log::info;
-use optee_utee::{
-    ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session,
-};
-use optee_utee::{Error, ErrorKind, ParamType, Parameters, Result};
+use optee_utee::{ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session};
+use optee_utee::{Error, ErrorKind, Parameters, Result};
 use spin::Mutex;
 use spin::Once;
 
@@ -154,7 +152,7 @@ fn create() -> Result<()> {
 
     info!("Hello from OP-TEE Keymint in Rust!");
 
-    if !crypto::clock::is_secure_time_source() {
+    if !optee_ta_common::is_secure_time_source() {
         return Err(Error::new(ErrorKind::Security));
     }
 
@@ -197,29 +195,13 @@ fn handle_ipc_request(keymint_ctx: &mut SessionContext, params: &mut Parameters)
         return Err(Error::new(ErrorKind::Busy));
     }
 
-    if params.0.raw().is_null() {
-        return Err(Error::new(ErrorKind::BadParameters));
-    }
-    // SAFETY: as_memref() dereferences the raw TEE_Param pointer, which is non-null.
-    let mut p = unsafe { params.0.as_memref()? };
-
-    // Check MemrefInput here because as_memref() does not differentiate
-    // between input and output.
-    if let ParamType::MemrefInput = p.param_type() {
-        let req = p.buffer();
-        // Deny requests that are too big.
-        if req.len() > KEYMINT_MAX_BUFFER_LENGTH {
-            return Err(Error::new(ErrorKind::Overflow));
-        }
-        let resp = keymint_ta().lock().0.process(req);
-        keymint_ctx.ipc_resp = Some(VecDeque::from(
-            kmr_ta::split_rsp(resp.as_slice(), KEYMINT_MAX_MESSAGE_CONTENT_SIZE)
-                .map_err(|_| Error::new(ErrorKind::Generic))?,
-        ));
-        Ok(())
-    } else {
-        Err(Error::new(ErrorKind::BadParameters))
-    }
+    let req = optee_ta_common::read_input(&mut params.0, KEYMINT_MAX_BUFFER_LENGTH)?;
+    let resp = keymint_ta().lock().0.process(&req);
+    keymint_ctx.ipc_resp = Some(VecDeque::from(
+        kmr_ta::split_rsp(resp.as_slice(), KEYMINT_MAX_MESSAGE_CONTENT_SIZE)
+            .map_err(|_| Error::new(ErrorKind::Generic))?,
+    ));
+    Ok(())
 }
 
 fn handle_ipc_response(keymint_ctx: &mut SessionContext, params: &mut Parameters) -> Result<()> {
@@ -227,33 +209,19 @@ fn handle_ipc_response(keymint_ctx: &mut SessionContext, params: &mut Parameters
     if keymint_ctx.ipc_resp.is_none() {
         return Err(Error::new(ErrorKind::NoData));
     }
+    // Check the size before take(): a ShortBuffer would drop the packets.
+    optee_ta_common::check_output(&mut params.0, KEYMINT_MAX_MESSAGE_CONTENT_SIZE)?;
 
-    if params.0.raw().is_null() {
-        return Err(Error::new(ErrorKind::BadParameters));
+    // Take all packets out. Unwrap() never panics.
+    let mut packets = keymint_ctx.ipc_resp.take().unwrap();
+    // Send only the packet at the front. Unwrap() never panics.
+    let packet = packets.pop_front().unwrap();
+    optee_ta_common::write_output(&mut params.0, &packet)?;
+    if packets.len() > 0 {
+        // Put any remaining packets back for the next request.
+        keymint_ctx.ipc_resp = Some(packets);
     }
-    // SAFETY: as_memref() dereferences the raw TEE_Param pointer, which is non-null.
-    let mut p = unsafe { params.0.as_memref()? };
-
-    // Check MemrefOutput here because as_memref() does not differentiate
-    // between input and output.
-    if let ParamType::MemrefOutput = p.param_type() {
-        // Take all packets out. Unwrap() never panics.
-        let mut packets = keymint_ctx.ipc_resp.take().unwrap();
-        // Send only the packet at the front. Unwrap() never panics.
-        let packet = packets.pop_front().unwrap();
-        if packet.len() > p.buffer().len() {
-            return Err(Error::new(ErrorKind::ShortBuffer));
-        }
-        p.set_updated_size(packet.len());
-        p.buffer().copy_from_slice(packet.as_slice());
-        if packets.len() > 0 {
-            // Put any remaining packets back for the next request.
-            keymint_ctx.ipc_resp = Some(packets);
-        }
-        Ok(())
-    } else {
-        Err(Error::new(ErrorKind::BadParameters))
-    }
+    Ok(())
 }
 
 /// Provision the attestation IDs, once: fails with `AccessConflict` if they
@@ -261,15 +229,8 @@ fn handle_ipc_response(keymint_ctx: &mut SessionContext, params: &mut Parameters
 fn handle_set_attestation_ids(params: &mut Parameters) -> Result<()> {
     use kmr_common::wire::{AsCborValue, SetAttestationIdsRequest};
 
-    if params.0.raw().is_null() {
-        return Err(Error::new(ErrorKind::BadParameters));
-    }
-    // SAFETY: as_memref() dereferences the raw TEE_Param pointer, which is non-null.
-    let mut p = unsafe { params.0.as_memref()? };
-    if !matches!(p.param_type(), ParamType::MemrefInput) || p.buffer().len() > KEYMINT_MAX_BUFFER_LENGTH {
-        return Err(Error::new(ErrorKind::BadParameters));
-    }
-    let req = SetAttestationIdsRequest::from_slice(p.buffer())
+    let req = optee_ta_common::read_input(&mut params.0, KEYMINT_MAX_BUFFER_LENGTH)?;
+    let req = SetAttestationIdsRequest::from_slice(&req)
         .map_err(|_| Error::new(ErrorKind::BadParameters))?;
     storage::attest_ids::provision(req.ids)
 }
