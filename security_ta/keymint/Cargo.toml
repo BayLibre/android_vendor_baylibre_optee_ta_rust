@@ -37,6 +37,7 @@ kmr-wire = "*"
 log = "0.4"
 optee-ipc-ta = { path = "../../optee_channel/optee-ipc-ta" }
 optee-logger-ta = { path = "../../optee_channel/optee-logger-ta" }
+optee-ta-common = { path = "../common" }
 optee-utee = { path = "../../../../../external/rust/teaclave-trustzone-sdk/optee-utee", default-features = false }
 optee-utee-sys = { path = "../../../../../external/rust/teaclave-trustzone-sdk/optee-utee/optee-utee-sys", default-features = false }
 pkcs1 = { version = "^0.7.5", features = ["alloc", "pkcs8"] }

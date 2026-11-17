@@ -279,6 +279,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "optee-ta-common"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "optee-utee",
+ "optee-utee-sys",
+]
+
+[[package]]
 name = "optee-utee"
 version = "0.7.0"
 dependencies = [
@@ -446,6 +455,7 @@ dependencies = [
  "log",
  "optee-ipc-ta",
  "optee-logger-ta",
+ "optee-ta-common",
  "optee-utee",
  "optee-utee-sys",
  "pkcs1",

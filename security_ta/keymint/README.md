@@ -33,15 +33,14 @@ offline in the AOSP tree with the prebuilt toolchains, to work with the HALs of
 |------|-------------|
 | `src/main.rs` | TA entry points, `KeyMintTa` singleton, command dispatch |
 | `src/command.rs` | Command IDs |
-| `src/config.rs` | TA header and properties (UUID, flags, stack/heap size) |
+| `src/config.rs` | TA header and properties (UUID, flags, stack/heap size), through `ta_config!` |
 | `src/crypto/` | `kmr_common::crypto` trait implementations on top of the GP TEE Internal Core API |
 | `src/keys.rs` | Root keys, derived from the hardware unique key |
 | `src/rpc.rs` | RKP artefacts (see [Limitations](#limitations)) |
 | `src/storage/sdsm.rs` | Secure deletion secret manager (rollback-resistant keys) |
 | `src/storage/attest_ids.rs` | Attestation IDs, provisioned once |
 | `src/error.rs` | OP-TEE to KeyMint error mapping |
-| `src/ta.aarch64.lds`, `src/ta.syms` | Linker script and exported symbols |
-| `Makefile` | cargo build, strip and signature (see [Build](#build)) |
+| `Makefile` | Sets the TA UUID and includes `../common/ta.mk` (see [Build](#build)) |
 | `Android.mk` | AOSP module of the signed TA |
 | `Checklist.md` | TA-side checklists of `system/keymint/README.md` |
 
@@ -49,7 +48,10 @@ Shared with the Gatekeeper TA:
 
 | Path | Description |
 |------|-------------|
-| `../rust/stubs.rs` | Symbols expected by the Rust runtime in a `no_std` TA (`getauxval`, `bcmp`, unwinding stubs) |
+| `../common/stubs.rs` | Symbols expected by the Rust runtime in a `no_std` TA (`getauxval`, `bcmp`, unwinding stubs) |
+| `../common/src/lib.rs` | `optee-ta-common`: TA UUIDs, `ta_config!` (TA header, properties, heap and trace symbols), system time, and parameter helpers (`read_input`, `check_output`, `write_output`) |
+| `../common/ta.mk` | Build rules shared by the TAs: cargo build, strip and signature |
+| `../common/ta.aarch64.lds`, `../common/ta.syms` | Linker script and exported symbols, shared by the TAs |
 | `../rust/const-oid` | `const-oid` 0.9 shim over AOSP's `const-oid` 0.10 (see [Crates](#crates)) |
 | `../../optee_channel/optee-ipc-ta` | System PTA calls (key derivation, RNG entropy) |
 | `../../optee_channel/optee-logger-ta` | `log` backend printing through the OP-TEE trace API |
@@ -163,7 +165,8 @@ factory reset.
 The TA is built by `vendor/optee/optee_os/mk/aosp_optee.mk`, included from
 `Android.mk` through `BUILD_OPTEE_MK` (set in
 `device/epam/aosp-xenvm-trout/optee/optee.mk`). It builds the OP-TEE TA dev
-kit, then calls this `Makefile`, which:
+kit, then calls this `Makefile`, which includes `../common/ta.mk`, shared
+with the other TA. It:
 
 1. Builds the TA with the AOSP prebuilt Rust toolchain, the same version as
    Soong (`RustDefaultVersion`), for `aarch64-unknown-none` (the prebuilt only
